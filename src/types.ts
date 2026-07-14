@@ -3,6 +3,7 @@ export interface EntryRow {
   date: string;
   quantity: number;
   purchasePrice: number;
+  baseRate?: number;
 }
 
 export interface MaterialSheet {

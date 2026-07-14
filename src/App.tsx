@@ -56,6 +56,18 @@ export default function App() {
   );
   const [activeMaterialId, setActiveMaterialId] = useState(materials[0]?.id ?? '');
 
+  const [importPendingData, setImportPendingData] = useState<{
+    fileName: string;
+    sheets: {
+      sheetName: string;
+      rows: Omit<EntryRow, 'id'>[];
+      baseRate?: number;
+      profitPercent?: number;
+      thresholdPercent?: number;
+    }[];
+  } | null>(null);
+  const [mappings, setMappings] = useState<Record<string, string>>({});
+
   const isSummaryView = activeMaterialId === SUMMARY_TAB;
   const activeSheet = materials.find((m) => m.id === activeMaterialId) ?? materials[0];
 
@@ -91,13 +103,17 @@ export default function App() {
     );
   };
 
-  const updateRow = (rowId: string, field: keyof EntryRow, value: string | number) => {
+  const updateRow = (rowId: string, field: keyof EntryRow, value: string | number | undefined) => {
     setMaterials((prev) =>
       prev.map((m) => {
         if (m.id !== activeMaterialId) return m;
+        let newRows = m.rows.map((row) => (row.id === rowId ? { ...row, [field]: value } : row));
+        if (field === 'date') {
+          newRows = [...newRows].sort((a, b) => a.date.localeCompare(b.date));
+        }
         return {
           ...m,
-          rows: m.rows.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)),
+          rows: newRows,
         };
       })
     );
@@ -105,9 +121,15 @@ export default function App() {
 
   const addRow = () => {
     setMaterials((prev) =>
-      prev.map((m) =>
-        m.id === activeMaterialId ? { ...m, rows: [...m.rows, createEmptyRow()] } : m
-      )
+      prev.map((m) => {
+        if (m.id !== activeMaterialId) return m;
+        const newRows = [...m.rows, createEmptyRow()];
+        newRows.sort((a, b) => a.date.localeCompare(b.date));
+        return {
+          ...m,
+          rows: newRows,
+        };
+      })
     );
   };
 
@@ -135,30 +157,85 @@ export default function App() {
     setMaterials((prev) => [...prev, newMaterial]);
     setActiveMaterialId(newMaterial.id);
   };
-
-  const applyImportToMaterial = (
-    materialId: string,
-    importedRows: Omit<EntryRow, 'id'>[],
-    meta?: {
+  const applyAllMappings = (
+    sheets: {
+      sheetName: string;
+      rows: Omit<EntryRow, 'id'>[];
       baseRate?: number;
       profitPercent?: number;
       thresholdPercent?: number;
-    }
+    }[],
+    targetMappings: Record<string, string>
   ) => {
-    setMaterials((prev) =>
-      prev.map((m) => {
-        if (m.id !== materialId) return m;
-        const existingData = m.rows.filter((r) => r.quantity > 0 || r.purchasePrice > 0);
-        const newRows = [...existingData, ...rowsFromImport(importedRows)];
-        return {
-          ...m,
-          baseRate: meta?.baseRate ?? m.baseRate,
-          profitPercent: meta?.profitPercent ?? m.profitPercent,
-          thresholdPercent: meta?.thresholdPercent ?? m.thresholdPercent,
-          rows: newRows.length ? newRows : [createEmptyRow()],
-        };
-      })
-    );
+    let importedCount = 0;
+    let sheetsCount = 0;
+
+    const newMaterialIds: Record<string, string> = {};
+    for (const parsed of sheets) {
+      if (targetMappings[parsed.sheetName] === 'new') {
+        newMaterialIds[parsed.sheetName] = createId();
+      }
+    }
+
+    setMaterials((prev) => {
+      const updated = [...prev];
+
+      for (const parsed of sheets) {
+        const target = targetMappings[parsed.sheetName];
+        if (!target || target === 'skip') continue;
+
+        sheetsCount++;
+        if (target === 'new') {
+          const newId = newMaterialIds[parsed.sheetName];
+          const newRows = rowsFromImport(parsed.rows);
+          newRows.sort((a, b) => a.date.localeCompare(b.date));
+          updated.push({
+            id: newId,
+            name: parsed.sheetName.toUpperCase(),
+            unit: 'KG',
+            baseRate: parsed.baseRate ?? 0,
+            profitPercent: parsed.profitPercent ?? 11,
+            thresholdPercent: parsed.thresholdPercent ?? 5,
+            rows: newRows,
+          });
+          importedCount += parsed.rows.length;
+        } else {
+          const matchIndex = updated.findIndex((m) => m.id === target);
+          if (matchIndex >= 0) {
+            const m = updated[matchIndex];
+            const existingData = m.rows.filter((r) => r.quantity > 0 || r.purchasePrice > 0);
+            const merged = [...existingData, ...rowsFromImport(parsed.rows)];
+            merged.sort((a, b) => a.date.localeCompare(b.date));
+            updated[matchIndex] = {
+              ...m,
+              baseRate: parsed.baseRate ?? m.baseRate,
+              profitPercent: parsed.profitPercent ?? m.profitPercent,
+              thresholdPercent: parsed.thresholdPercent ?? m.thresholdPercent,
+              rows: merged.length ? merged : [createEmptyRow()],
+            };
+            importedCount += parsed.rows.length;
+          }
+        }
+      }
+
+      return updated;
+    });
+
+    if (!isSummaryView) {
+      const firstValidSheet = sheets.find(
+        (s) => targetMappings[s.sheetName] && targetMappings[s.sheetName] !== 'skip'
+      );
+      if (firstValidSheet) {
+        const target = targetMappings[firstValidSheet.sheetName];
+        const targetId = target === 'new' ? newMaterialIds[firstValidSheet.sheetName] : target;
+        if (targetId) {
+          setActiveMaterialId(targetId);
+        }
+      }
+    }
+
+    setImportMessage(`Imported ${importedCount} rows across ${sheetsCount} sheet(s).`);
+    setImportPendingData(null);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,46 +262,52 @@ export default function App() {
         }));
       }
 
-      if (isSummaryView || sheetsWithData.length > 1) {
-        let importedCount = 0;
-        setMaterials((prev) => {
-          const updated = [...prev];
-          for (const parsed of sheetsWithData) {
-            const matchIndex = updated.findIndex(
-              (m) => m.name.toUpperCase() === parsed.sheetName.toUpperCase()
-            );
-            if (matchIndex >= 0) {
-              const m = updated[matchIndex];
-              const existingData = m.rows.filter((r) => r.quantity > 0 || r.purchasePrice > 0);
-              const merged = [...existingData, ...rowsFromImport(parsed.rows)];
-              updated[matchIndex] = {
-                ...m,
-                baseRate: parsed.baseRate ?? m.baseRate,
-                profitPercent: parsed.profitPercent ?? m.profitPercent,
-                thresholdPercent: parsed.thresholdPercent ?? m.thresholdPercent,
-                rows: merged.length ? merged : [createEmptyRow()],
-              };
-              importedCount += parsed.rows.length;
+      const initialMappings: Record<string, string> = {};
+      let hasUnmapped = false;
+
+      const normalizeName = (name: string) => name.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+
+      for (const parsed of sheetsWithData) {
+        const sName = parsed.sheetName.toUpperCase();
+        const fName = file.name.toUpperCase();
+        const normSName = normalizeName(sName);
+
+        // 1. Try exact normalized match first (e.g. LAWRENCEPUR_SAND matches LAWRENCEPUR SAND)
+        let match = materials.find((m) => normalizeName(m.name) === normSName);
+
+        // 2. If no exact match, look for substring matches (where one contains the other)
+        if (!match) {
+          match = materials.find((m) => {
+            const mName = m.name.toUpperCase();
+            return sName === mName || sName.includes(mName) || mName.includes(sName);
+          });
+        }
+
+        if (match) {
+          initialMappings[parsed.sheetName] = match.id;
+        } else {
+          if (!isSummaryView && sheetsWithData.length === 1 && activeSheet) {
+            initialMappings[parsed.sheetName] = activeSheet.id;
+          } else {
+            const fileMatch = materials.find((m) => fName.includes(m.name.toUpperCase()));
+            if (fileMatch) {
+              initialMappings[parsed.sheetName] = fileMatch.id;
             } else {
-              updated.push({
-                id: createId(),
-                name: parsed.sheetName.toUpperCase(),
-                unit: 'KG',
-                baseRate: parsed.baseRate ?? 0,
-                profitPercent: parsed.profitPercent ?? 11,
-                thresholdPercent: parsed.thresholdPercent ?? 5,
-                rows: rowsFromImport(parsed.rows),
-              });
-              importedCount += parsed.rows.length;
+              initialMappings[parsed.sheetName] = 'new';
+              hasUnmapped = true;
             }
           }
-          return updated;
+        }
+      }
+
+      if (hasUnmapped) {
+        setImportPendingData({
+          fileName: file.name,
+          sheets: sheetsWithData,
         });
-        setImportMessage(`Imported ${importedCount} rows across ${sheetsWithData.length} sheet(s).`);
-      } else if (activeSheet) {
-        const parsed = sheetsWithData[0];
-        applyImportToMaterial(activeSheet.id, parsed.rows, parsed);
-        setImportMessage(`Imported ${parsed.rows.length} rows into ${activeSheet.name}.`);
+        setMappings(initialMappings);
+      } else {
+        applyAllMappings(sheetsWithData, initialMappings);
       }
     } catch {
       setImportMessage('Failed to read Excel file. Please check the format.');
@@ -525,7 +608,20 @@ export default function App() {
                         />
                       </td>
                       <td className="calc">{formatCurrency(calc.purchasePriceWithProfit)}</td>
-                      <td className="calc">{formatCurrency(calc.baseRate)}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="cell-input num"
+                          value={row.baseRate || ''}
+                          placeholder={activeSheet.baseRate ? activeSheet.baseRate.toString() : 'Rate'}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            updateRow(row.id, 'baseRate', isNaN(val) ? undefined : val);
+                          }}
+                        />
+                      </td>
                       <td className={`calc ${calc.increaseAmount >= 0 ? 'up' : 'down'}`}>
                         {formatCurrency(calc.increaseAmount)}
                       </td>
@@ -591,6 +687,78 @@ export default function App() {
             Rows are added to this material automatically.
           </footer>
         </>
+      )}
+
+      {importPendingData && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-content">
+            <header className="modal-header">
+              <h3>Import Mapping</h3>
+              <button
+                type="button"
+                className="close-modal-btn"
+                onClick={() => setImportPendingData(null)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="modal-body">
+              <p className="import-source-info">
+                Importing data from <strong>{importPendingData.fileName}</strong>. We found{' '}
+                {importPendingData.sheets.length} sheet(s) with data.
+              </p>
+              <div className="sheet-mapping-list">
+                {importPendingData.sheets.map((sheet) => (
+                  <div key={sheet.sheetName} className="sheet-mapping-item">
+                    <div className="sheet-info">
+                      <span className="sheet-name">{sheet.sheetName}</span>
+                      <span className="sheet-rows-count">{sheet.rows.length} rows</span>
+                    </div>
+                    <div className="sheet-mapping-select">
+                      <label htmlFor={`map-${sheet.sheetName}`}>Map to:</label>
+                      <select
+                        id={`map-${sheet.sheetName}`}
+                        value={mappings[sheet.sheetName] || 'new'}
+                        onChange={(e) =>
+                          setMappings((prev) => ({
+                            ...prev,
+                            [sheet.sheetName]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="new">Create New Material "{sheet.sheetName.toUpperCase()}"</option>
+                        <option value="skip">Skip / Do Not Import</option>
+                        <optgroup label="Merge into Existing:">
+                          {materials.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <footer className="modal-footer">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setImportPendingData(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => applyAllMappings(importPendingData.sheets, mappings)}
+              >
+                Import Data
+              </button>
+            </footer>
+          </div>
+        </div>
       )}
     </div>
   );

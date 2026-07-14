@@ -6,7 +6,9 @@ export function calculateRow(
   serialNo: number
 ): CalculatedRow {
   const { quantity, purchasePrice, date } = row;
-  const { name, unit, baseRate, profitPercent, thresholdPercent } = sheet;
+  const { name, unit, profitPercent, thresholdPercent } = sheet;
+
+  const baseRate = row.baseRate !== undefined && row.baseRate > 0 ? row.baseRate : sheet.baseRate;
 
   const purchasePriceWithProfit = purchasePrice * (1 + profitPercent / 100);
   const increaseAmount = purchasePriceWithProfit - baseRate;

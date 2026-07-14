@@ -33,7 +33,27 @@ function parseDate(value: unknown): string {
     }
   }
   const str = String(value).trim();
+  
+  // Format YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  
+  // Format DD-MM-YYYY or DD/MM/YYYY
+  const dmMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmMatch) {
+    const d = dmMatch[1].padStart(2, '0');
+    const m = dmMatch[2].padStart(2, '0');
+    const y = dmMatch[3];
+    const part1 = parseInt(dmMatch[1], 10);
+    const part2 = parseInt(dmMatch[2], 10);
+    if (part1 > 12) {
+      return `${y}-${m}-${d}`;
+    } else if (part2 > 12) {
+      return `${y}-${d}-${m}`;
+    } else {
+      return `${y}-${m}-${d}`;
+    }
+  }
+
   const d = new Date(str);
   if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
   return new Date().toISOString().slice(0, 10);
@@ -45,9 +65,9 @@ function findHeaderRow(rows: unknown[][]): number {
     if (!row) continue;
     const joined = row.map(cellStr).join(' ').toLowerCase();
     if (
-      joined.includes('date') &&
+      (joined.includes('date') || joined.includes('dt')) &&
       (joined.includes('quantity') || joined.includes('qty')) &&
-      joined.includes('purchase')
+      (joined.includes('purchase') || joined.includes('price') || joined.includes('rate') || joined.includes('cost'))
     ) {
       return i;
     }
@@ -56,9 +76,13 @@ function findHeaderRow(rows: unknown[][]): number {
 }
 
 function getColumnIndex(headers: unknown[], ...names: string[]): number {
-  for (let i = 0; i < headers.length; i++) {
-    const h = cellStr(headers[i]).toLowerCase();
-    for (const name of names) {
+  for (const name of names) {
+    for (let i = 0; i < headers.length; i++) {
+      const h = cellStr(headers[i]).toLowerCase();
+      // Avoid matching "Agreed Rate" or "Base Rate" when looking for general "price" or "rate"
+      if ((name === 'price' || name === 'rate') && (h.includes('agreed') || h.includes('base'))) {
+        continue;
+      }
       if (h.includes(name)) return i;
     }
   }
@@ -81,7 +105,7 @@ function parseMetadata(rows: unknown[][], headerRowIndex: number): Partial<Parse
     else if (key.includes('agreed rate')) meta.baseRate = parseNumber(val);
     else if (key.includes('profit')) meta.profitPercent = parseNumber(val);
     else if (key.includes('threshold')) meta.thresholdPercent = parseNumber(val);
-    else if (i === 0 && !key && cellStr(val) === '' && cellStr(row[0])) {
+    else if (i === 0 && cellStr(val) === '' && cellStr(row[0])) {
       project.title = cellStr(row[0]);
     }
   }
@@ -100,9 +124,10 @@ export function parseWorksheet(sheet: XLSX.WorkSheet, sheetName: string): Parsed
 
   const meta = parseMetadata(rows, headerRowIndex);
   const headers = rows[headerRowIndex];
-  const dateCol = getColumnIndex(headers, 'date');
-  const qtyCol = getColumnIndex(headers, 'quantity', 'qty');
-  const priceCol = getColumnIndex(headers, 'purchase price', 'purchase');
+  const dateCol = getColumnIndex(headers, 'date', 'dt');
+  const qtyCol = getColumnIndex(headers, 'quantity', 'qty', 'quant', 'vol', 'volume');
+  const priceCol = getColumnIndex(headers, 'purchase price', 'purchase', 'price', 'rate');
+  const baseRateCol = getColumnIndex(headers, 'agreed rate', 'agreed', 'base rate', 'base');
 
   const parsedRows: Omit<EntryRow, 'id'>[] = [];
 
@@ -116,10 +141,16 @@ export function parseWorksheet(sheet: XLSX.WorkSheet, sheetName: string): Parsed
     const quantity = qtyCol >= 0 ? parseNumber(row[qtyCol]) : 0;
     const purchasePrice = priceCol >= 0 ? parseNumber(row[priceCol]) : 0;
     const date = dateCol >= 0 ? parseDate(row[dateCol]) : new Date().toISOString().slice(0, 10);
+    const baseRate = baseRateCol >= 0 ? parseNumber(row[baseRateCol]) : undefined;
 
     if (quantity === 0 && purchasePrice === 0) continue;
 
-    parsedRows.push({ date, quantity, purchasePrice });
+    parsedRows.push({
+      date,
+      quantity,
+      purchasePrice,
+      ...(baseRate && baseRate > 0 ? { baseRate } : {}),
+    });
   }
 
   return {
