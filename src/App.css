@@ -1,0 +1,440 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+}
+
+.title-input {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+  color: #1b5e20;
+  margin-bottom: 16px;
+  padding: 4px;
+}
+
+.title-input:focus {
+  outline: 2px solid #2e7d32;
+  border-radius: 4px;
+}
+
+.project-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 20px;
+}
+
+.project-fields label,
+.material-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.project-fields input,
+.material-config input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.project-fields input:focus,
+.material-config input:focus {
+  outline: 2px solid #2e7d32;
+  border-color: #2e7d32;
+}
+
+.material-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: #e8e8e8;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+  transition: background 0.15s;
+}
+
+.tab:hover {
+  background: #ddd;
+}
+
+.tab.active {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
+.tab.add-tab {
+  background: transparent;
+  border-style: dashed;
+  color: #2e7d32;
+}
+
+.tab.summary-tab {
+  background: #e3f2fd;
+  border-color: #1565c0;
+  color: #1565c0;
+}
+
+.tab.summary-tab.active {
+  background: #1565c0;
+  color: #fff;
+  border-color: #1565c0;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.import-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #e8f5e9;
+  border: 1px solid #2e7d32;
+  color: #1b5e20;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.88rem;
+}
+
+.dismiss-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #555;
+  line-height: 1;
+}
+
+.summary-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.summary-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  color: #1565c0;
+}
+
+.summary-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.summary-table-wrap {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.summary-table {
+  min-width: auto;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #1565c0;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.summary-actions {
+  white-space: nowrap;
+}
+
+.mini-btn {
+  padding: 4px 8px;
+  margin: 0 2px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.mini-btn:hover {
+  background: #e8f5e9;
+  border-color: #2e7d32;
+}
+
+.summary-actions-bar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.action-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+.material-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #fff;
+  padding: 14px 20px;
+  border: 1px solid #ccc;
+  border-radius: 0 8px 8px 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.material-config label {
+  min-width: 120px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 1100px;
+}
+
+.data-table thead tr {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.data-table th {
+  padding: 10px 6px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  border: 1px solid #1b5e20;
+}
+
+.data-table td {
+  padding: 6px 4px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+.data-table tbody tr.alt {
+  background: #f5f5f5;
+}
+
+.data-table tbody tr:hover {
+  background: #e8f5e9;
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 70px;
+  padding: 4px 6px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.cell-input.num {
+  text-align: right;
+}
+
+.cell-input:focus {
+  outline: 2px solid #2e7d32;
+  border-color: #2e7d32;
+}
+
+.calc {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.calc.up {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.calc.down {
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.total-cell {
+  font-weight: 700;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  color: #c62828;
+}
+
+.data-table tfoot tr {
+  background: #e8f5e9;
+  font-weight: 700;
+}
+
+.grand-label {
+  text-align: right !important;
+  padding-right: 16px !important;
+  font-size: 0.85rem;
+}
+
+.grand-total {
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn.primary {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #1b5e20;
+}
+
+.btn.secondary {
+  background: #fff;
+  color: #2e7d32;
+  border: 2px solid #2e7d32;
+}
+
+.btn.secondary:hover {
+  background: #e8f5e9;
+}
+
+.btn.excel {
+  background: #1d6f42;
+  color: #fff;
+}
+
+.btn.excel:hover {
+  background: #145a32;
+}
+
+.formula-note {
+  background: #fff;
+  border-left: 4px solid #2e7d32;
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  color: #555;
+  line-height: 1.6;
+  border-radius: 0 6px 6px 0;
+}
+
+@media (max-width: 768px) {
+  .app {
+    padding: 12px 8px 32px;
+  }
+
+  .title-input {
+    font-size: 1rem;
+  }
+
+  .material-config {
+    flex-direction: column;
+  }
+}
